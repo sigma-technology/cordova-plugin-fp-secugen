@@ -362,7 +362,7 @@ public class FPSecugen extends CordovaPlugin {
         dwTimeStart = System.currentTimeMillis();
 
         sgfplib.SetLedOn(true);
-        long result = sgfplib.GetImageEx(buffer, 5000, 0);
+        long result = sgfplib.GetImageEx(buffer, 30000, 0);
 
         String NFIQString = "";
 
@@ -386,7 +386,7 @@ public class FPSecugen extends CordovaPlugin {
             if (result == SGFDxErrorCode.SGFDX_ERROR_NONE) {
                 fingerInfo.FingerNumber = SGFingerPosition.SG_FINGPOS_LI;
                 fingerInfo.ImageQuality = quality[0];
-                fingerInfo.ImpressionType = SGImpressionType.SG_IMPTYPE_LP;
+                fingerInfo.ImpressionType = SGImpressionType.SG_IMPTYPE_NP;
                 fingerInfo.ViewNumber = 1;
                 Log.d("FP Image Quality", fingerInfo.ImageQuality + "");
                 if (fingerInfo.ImageQuality >= QUALITY_VALUE) {
