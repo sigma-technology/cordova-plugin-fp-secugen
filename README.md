@@ -13,7 +13,7 @@ Customised for Recollections Fingerprint Scanner App
 
 ``` 
 dependencies {
-    compile files('libs/FDxSDKProAndroid.jar')
+    implementation files('libs/FDxSDKProAndroid.jar')
 }
 ```
 
