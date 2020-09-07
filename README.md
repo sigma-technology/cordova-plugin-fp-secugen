@@ -1,5 +1,5 @@
 # Cordova Secugen Finger Print Plugin Android
-Customised for Recollections Fingerprint Scanner App
+Customised for Fingerprint Scanner App
 
 ## Simple cordova plugin that takes care of Secugen Native APIs for Android.
 
@@ -7,13 +7,22 @@ Customised for Recollections Fingerprint Scanner App
 
 1.  Add the plugin in your project **cordova plugin add sigma-technology/cordova-plugin-fp-secugen**
 2.  You have to request for jar and .so files from Secugen Website. They ask a valid email id and send android sdk to this email.
-3.  Copy complete **libs folder** from the provided zip file to your projects **android/libs** folder.  
-4.  Also add **FDxSDKProAndroid.jar** file from zip sdk file to the your projects **android/libs** folder.
-5.  Now add **FDxSDKProAndroid.jar** to dependencies in **android/build.gradle** file eg:
+3.  Copy complete **libs folder** from the provided zip file to your projects **android/app/libs** folder.  
+4.  Also add **FDxSDKProAndroid.jar** file from zip sdk file to the your projects **android/app/libs** folder.
+5.  Now add **FDxSDKProAndroid.jar** and ***.so** to dependencies in **android/app/build.gradle** file eg:
 
 ``` 
 dependencies {
+    implementation fileTree(dir: 'libs', include: ['*.jar', '*.so'])
     implementation files('libs/FDxSDKProAndroid.jar')
+}
+```
+
+6. Add jniLibs to sourceSets in **android/app/build.gradle** file eg:
+
+```
+sourceSets {
+    main.jniLibs.srcDirs = ["libs"]
 }
 ```
 
