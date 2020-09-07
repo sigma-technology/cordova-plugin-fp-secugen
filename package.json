@@ -18,10 +18,10 @@
       "version": ">=3.4.0"
     }
   ],
-  "author": "Saad Usmani",
+  "author": "SIGMA Technology",
   "license": "ISC",
   "repository": {
     "type": "git",
-      "url": "https://github.com/UsmaniSaad/cordova-plugin-fp-secugen"
+      "url": "https://github.com/sigma-technology/cordova-plugin-fp-secugen"
   }
 }
