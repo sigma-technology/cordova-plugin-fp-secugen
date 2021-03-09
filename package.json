@@ -1,6 +1,6 @@
 {
   "name": "cordova-plugin-fp-secugen",
-  "version": "0.1.14",
+  "version": "1.0.0",
   "description": "Cordova Secugen Finger Print Plugin",
   "cordova": {
     "id": "cordova-plugin-fp-secugen",
