@@ -5,6 +5,8 @@ Customised for Fingerprint Scanner App
 
 ### Steps to add this plugin in your project.
 
+## NOTE: As of release 1.1 Secugen's SDK v4.3 or above is required!
+
 1.  Add the plugin in your project **cordova plugin add sigma-technology/cordova-plugin-fp-secugen**
 2.  You have to request for jar and .so files from Secugen Website. They ask a valid email id and send android sdk to this email.
 3.  Copy complete **libs folder** from the provided zip file to your projects **android/app/libs** folder.  

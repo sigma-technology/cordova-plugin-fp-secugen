@@ -226,7 +226,7 @@ public class FPSecugen extends CordovaPlugin {
             @Override
             public void run() {
                 manager = (UsbManager) cordova.getActivity().getSystemService(Context.USB_SERVICE);
-                sgfplib = new JSGFPLib((UsbManager) context.getSystemService(Context.USB_SERVICE));
+                sgfplib = new JSGFPLib((Context) cordova.getActivity().getBaseContext(), (UsbManager) context.getSystemService(Context.USB_SERVICE));
 
                 mLed = false;
 
@@ -251,7 +251,7 @@ public class FPSecugen extends CordovaPlugin {
                     }
 
                     // create the intent that will be used to get the permission
-                    PendingIntent pendingIntent = PendingIntent.getBroadcast(cordova.getActivity(), 0, new Intent(UsbBroadcastReceiver.USB_PERMISSION), 0);
+                    PendingIntent pendingIntent = PendingIntent.getBroadcast(cordova.getActivity(), 0, new Intent(UsbBroadcastReceiver.USB_PERMISSION), PendingIntent.FLAG_MUTABLE);
                     // and a filter on the permission we ask
                     IntentFilter filter = new IntentFilter();
                     filter.addAction(UsbBroadcastReceiver.USB_PERMISSION);
