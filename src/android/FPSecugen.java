@@ -353,6 +353,39 @@ public class FPSecugen extends CordovaPlugin {
         }
     }
 
+    private float scoreMappingFunction (long nistScore, int imageQuality) {
+        int reverse = -(int)nistScore + 5;
+        float linerlyScaled = reverse * 0.8f;
+        float scaled = reverse * 20;
+        float ImageQualityScaled = customFunction(imageQuality) * 0.2f;
+        return (scaled + ImageQualityScaled);
+    }
+
+    private float customFunction(float scaledScore) {
+        if (scaledScore < 20) {
+            return (float) sigmoidLowerBound(scaledScore);
+        } else {
+            return (float) sigmoidUpperBound(scaledScore);
+        }
+    }
+
+    private int finalScore(long nistScore, int imageQuality) {
+        if (nistScore < 0) {
+            return 0;
+        }
+
+        float mapped = scoreMappingFunction(nistScore, imageQuality);
+        return (int) customFunction(mapped);
+    }
+
+    private double sigmoidLowerBound (float x) {
+        return 100 / (1 + Math.exp((-x + 20) * 0.13));
+    }
+
+    private double sigmoidUpperBound (float x) {
+        return 100 / (1 + Math.exp((-x + 20) * 0.05));
+    }
+
     public ImageData captureFingerPrint1(final CallbackContext callbackContext) throws IOException {
 //        sgfplib.
 
@@ -382,13 +415,18 @@ public class FPSecugen extends CordovaPlugin {
 
         if (result == SGFDxErrorCode.SGFDX_ERROR_NONE) {
             result = sgfplib.GetImageQuality(mImageWidth, mImageHeight, buffer, quality);
+            long nistScore = sgfplib.ComputeNFIQEx(buffer, mImageWidth, mImageHeight, 500);
 
             if (result == SGFDxErrorCode.SGFDX_ERROR_NONE) {
                 fingerInfo.FingerNumber = SGFingerPosition.SG_FINGPOS_LI;
                 fingerInfo.ImageQuality = quality[0];
                 fingerInfo.ImpressionType = SGImpressionType.SG_IMPTYPE_NP;
                 fingerInfo.ViewNumber = 1;
+                int finalScore = finalScore(nistScore, fingerInfo.ImageQuality);
                 Log.d("FP Image Quality", fingerInfo.ImageQuality + "");
+                Log.d("FP NIST Score", nistScore + "");
+                Log.d("FP Score", scoreMappingFunction(nistScore, fingerInfo.ImageQuality) + "");
+                Log.d("FP Final Score", finalScore + "");
                 if (fingerInfo.ImageQuality >= QUALITY_VALUE) {
 
                     result = sgfplib.WSQGetEncodedImageSize(wsqImageOutSize,
@@ -430,6 +468,8 @@ public class FPSecugen extends CordovaPlugin {
                                 json.put("wsqImage", wsqEncoded);
                                 json.put("errorCode", 0);
                                 json.put("quality", fingerInfo.ImageQuality);
+                                json.put("nistScore", nistScore);
+                                json.put("finalScore", finalScore);
                                 json.put("serialNumber", serialNumber);
                             } catch (JSONException ex) {
                                 Log.d("Exception", "JSON Exception");
