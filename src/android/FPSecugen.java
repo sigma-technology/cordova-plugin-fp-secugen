@@ -182,6 +182,165 @@ public class FPSecugen extends CordovaPlugin {
         }
     }
 
+    private int analyzeRidgeClarity(byte[] imageData, int width, int height) {
+        int transitions = 0;
+        int cleanTransitions = 0;
+
+        // Analyze horizontal scanlines at regular intervals
+        int scanlines = 10;
+        int step = height / scanlines;
+
+        for (int y = step; y < height; y += step) {
+            // Convert signed byte to unsigned int (0-255)
+            int lastVal = imageData[y * width] & 0xFF;
+            boolean inRidge = (lastVal < 128);
+
+            for (int x = 1; x < width; x++) {
+                // Convert signed byte to unsigned int (0-255)
+                int val = imageData[y * width + x] & 0xFF;
+                boolean currentRidge = (val < 128);
+
+                if (inRidge != currentRidge) {
+                    transitions++;
+                    // Check for clean transitions
+                    if (Math.abs(val - lastVal) > 20) { // Reduced threshold
+                        cleanTransitions++;
+                    }
+                    inRidge = currentRidge;
+                }
+                lastVal = val;
+            }
+        }
+
+        // Debug info
+        Log.d("RidgeClarity", "Transitions: " + transitions + ", Clean: " + cleanTransitions);
+        return (transitions > 0) ? (cleanTransitions * 100 / transitions) : 0;
+    }
+
+    private float calculateEdgeQuality(byte[] imageData, int width, int height) {
+        byte[] edges = new byte[width * height];
+
+        // Apply simple edge detection
+        for (int y = 1; y < height - 1; y++) {
+            for (int x = 1; x < width - 1; x++) {
+                // Simplified Sobel operator
+                int gx = Math.abs(imageData[y*width + x+1] & 0xFF - imageData[y*width + x-1] & 0xFF);
+                int gy = Math.abs(imageData[(y+1)*width + x] & 0xFF - imageData[(y-1)*width + x] & 0xFF);
+                edges[y*width + x] = (byte)Math.min(255, gx + gy);
+            }
+        }
+
+        // Calculate edge quality metrics
+        int strongEdges = 0;
+        int weakEdges = 0;
+
+        for (byte edge : edges) {
+            int val = edge & 0xFF;
+            if (val > 80) strongEdges++;
+            else if (val > 30) weakEdges++;
+        }
+
+        // Good ratio of strong to weak edges indicates clear pattern
+        return strongEdges > 0 ? (float)strongEdges / (strongEdges + weakEdges) * 100 : 0;
+    }
+
+    private int assessPatternContinuity(byte[] imageData, int width, int height) {
+        // Sample ridge widths across the image
+        int[] ridgeWidths = new int[100];
+        int samples = 0;
+
+        for (int y = height/4; y < height*3/4; y += height/20) {
+            int currentRun = 0;
+            // Set initial ridge state based on first pixel
+            boolean inRidge = (imageData[y * width] & 0xFF) < 128;
+
+            for (int x = 0; x < width; x++) {
+                // Convert signed byte to unsigned int (0-255)
+                boolean isRidge = (imageData[y * width + x] & 0xFF) < 128;
+
+                if (isRidge == inRidge) {
+                    currentRun++;
+                } else {
+                    // Save the run length if we're exiting a ridge
+                    if (inRidge && samples < ridgeWidths.length && currentRun > 1) {
+                        ridgeWidths[samples++] = currentRun;
+                    }
+                    currentRun = 1;
+                    inRidge = isRidge;
+                }
+            }
+
+            // Don't forget the last run if it's a ridge
+            if (inRidge && samples < ridgeWidths.length && currentRun > 1) {
+                ridgeWidths[samples++] = currentRun;
+            }
+        }
+
+        // Debug info
+        Log.d("PatternContinuity", "Samples collected: " + samples);
+
+        // Calculate consistency score
+        return calculateConsistencyScore(ridgeWidths, samples);
+    }
+
+    private int calculateConsistencyScore(int[] widths, int count) {
+        if (count < 3) {
+            Log.d("ConsistencyScore", "Not enough samples: " + count);
+            return 0; // Not enough data points
+        }
+
+        // Calculate mean
+        double sum = 0;
+        for (int i = 0; i < count; i++) {
+            sum += widths[i];
+        }
+        double mean = sum / count;
+
+        if (mean <= 0) {
+            Log.d("ConsistencyScore", "Invalid mean: " + mean);
+            return 0;
+        }
+
+        // Calculate standard deviation
+        double variance = 0;
+        for (int i = 0; i < count; i++) {
+            variance += Math.pow(widths[i] - mean, 2);
+        }
+        double stdDev = Math.sqrt(variance / count);
+
+        // Convert to score (lower std dev = higher consistency = higher score)
+        double normalizedStdDev = Math.min(stdDev / mean, 1.0);
+        int score = (int)(100 * (1.0 - normalizedStdDev));
+
+        Log.d("ConsistencyScore", "Mean: " + mean + ", StdDev: " + stdDev + ", Score: " + score);
+        return score;
+    }
+
+    // Replace the existing finalScore method with this improved version
+    private int finalScore(long nistScore, int imageQuality, byte[] imageData) {
+        if (nistScore < 0) {
+            return 0;
+        }
+
+        // Calculate additional quality metrics
+        int ridgeClarity = analyzeRidgeClarity(imageData, mImageWidth, mImageHeight);
+        float edgeQuality = calculateEdgeQuality(imageData, mImageWidth, mImageHeight);
+        int patternContinuity = assessPatternContinuity(imageData, mImageWidth, mImageHeight);
+
+        // Normalize NIST score (lower is better in NIST)
+        float normalizedNist = (6 - nistScore) * 20; // Convert to 0-100 scale
+
+        // Weighted combination with reduced emphasis on pure darkness
+        float combinedScore =
+                normalizedNist * 0.35f +        // Standard quality measure
+                        imageQuality * 0.10f +          // Basic darkness (reduced weight)
+                        ridgeClarity * 0.25f +          // Ridge clarity (important for clean lines)
+                        edgeQuality * 0.20f +           // Edge quality (important for vectors)
+                        patternContinuity * 0.10f;      // Pattern consistency
+
+        return Math.round(combinedScore);
+    }
+
     /*private void openDevice() {
 
 //        Toast.makeText(context, "Permission", Toast.LENGTH_SHORT).show();
@@ -265,7 +424,6 @@ public class FPSecugen extends CordovaPlugin {
             }
         });
     }
-
 
     private void exitApplication() {
         cordova.getActivity().finish();
@@ -369,15 +527,6 @@ public class FPSecugen extends CordovaPlugin {
         }
     }
 
-    private int finalScore(long nistScore, int imageQuality) {
-        if (nistScore < 0) {
-            return 0;
-        }
-
-        float mapped = scoreMappingFunction(nistScore, imageQuality);
-        return (int) customFunction(mapped);
-    }
-
     private double sigmoidLowerBound (float x) {
         return 100 / (1 + Math.exp((-x + 20) * 0.13));
     }
@@ -422,11 +571,22 @@ public class FPSecugen extends CordovaPlugin {
                 fingerInfo.ImageQuality = quality[0];
                 fingerInfo.ImpressionType = SGImpressionType.SG_IMPTYPE_NP;
                 fingerInfo.ViewNumber = 1;
-                int finalScore = finalScore(nistScore, fingerInfo.ImageQuality);
+
+                // Calculate metrics for better vectorisation quality assessment
+                int ridgeClarity = analyzeRidgeClarity(buffer, mImageWidth, mImageHeight);
+                float edgeQuality = calculateEdgeQuality(buffer, mImageWidth, mImageHeight);
+                int patternContinuity = assessPatternContinuity(buffer, mImageWidth, mImageHeight);
+
+                // Use improved final score calculation
+                int finalScore = finalScore(nistScore, fingerInfo.ImageQuality, buffer);
+
                 Log.d("FP Image Quality", fingerInfo.ImageQuality + "");
                 Log.d("FP NIST Score", nistScore + "");
-                Log.d("FP Score", scoreMappingFunction(nistScore, fingerInfo.ImageQuality) + "");
+                Log.d("FP Ridge Clarity", ridgeClarity + "");
+                Log.d("FP Edge Quality", edgeQuality + "");
+                Log.d("FP Pattern Continuity", patternContinuity + "");
                 Log.d("FP Final Score", finalScore + "");
+
                 if (fingerInfo.ImageQuality >= QUALITY_VALUE) {
 
                     result = sgfplib.WSQGetEncodedImageSize(wsqImageOutSize,
@@ -464,11 +624,15 @@ public class FPSecugen extends CordovaPlugin {
 //                            bos.close();
                             JSONObject json = new JSONObject();
                             try {
+                                // Inside the try block where you build your JSON response:
                                 json.put("image", encoded);
                                 json.put("wsqImage", wsqEncoded);
                                 json.put("errorCode", 0);
                                 json.put("quality", fingerInfo.ImageQuality);
                                 json.put("nistScore", nistScore);
+                                json.put("ridgeClarity", ridgeClarity);
+                                json.put("edgeQuality", edgeQuality);
+                                json.put("patternContinuity", patternContinuity);
                                 json.put("finalScore", finalScore);
                                 json.put("serialNumber", serialNumber);
                             } catch (JSONException ex) {
@@ -592,4 +756,3 @@ public class FPSecugen extends CordovaPlugin {
         }
     }
 }
-
