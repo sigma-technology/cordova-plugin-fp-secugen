@@ -332,11 +332,11 @@ public class FPSecugen extends CordovaPlugin {
 
         // Weighted combination with reduced emphasis on pure darkness
         float combinedScore =
-                normalizedNist * 0.35f +        // Standard quality measure
-                        imageQuality * 0.10f +          // Basic darkness (reduced weight)
-                        ridgeClarity * 0.25f +          // Ridge clarity (important for clean lines)
-                        edgeQuality * 0.20f +           // Edge quality (important for vectors)
-                        patternContinuity * 0.10f;      // Pattern consistency
+            imageQuality * 0.25f +          // Basic darkness
+            normalizedNist * 0.25f +        // Standard quality measure
+            ridgeClarity * 0.15f +          // Ridge clarity (important for clean lines)
+            edgeQuality * 0.30f +           // Edge quality (important for vectors)
+            patternContinuity * 0.05f;      // Pattern consistency
 
         return Math.round(combinedScore);
     }
