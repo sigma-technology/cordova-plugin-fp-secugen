@@ -183,41 +183,149 @@ public class FPSecugen extends CordovaPlugin {
     }
 
     private int analyzeRidgeClarity(byte[] imageData, int width, int height) {
-        int transitions = 0;
-        int cleanTransitions = 0;
+        // New approach: Analyze edge response variance and ridge frequency distribution
 
-        // Analyze horizontal scanlines at regular intervals
-        int scanlines = 10;
-        int step = height / scanlines;
+        // 1. Compute horizontal and vertical gradient magnitudes using Sobel-like operators
+        int[] gradientMagnitudes = new int[width * height];
+        int[] ridgeFrequencies = new int[30]; // Store frequencies of different ridge widths
 
-        for (int y = step; y < height; y += step) {
-            // Convert signed byte to unsigned int (0-255)
-            int lastVal = imageData[y * width] & 0xFF;
-            boolean inRidge = (lastVal < 128);
+        // Skip the border pixels to avoid edge effects
+        for (int y = 2; y < height - 2; y++) {
+            for (int x = 2; x < width - 2; x++) {
+                // Simple horizontal and vertical gradients
+                int gx = Math.abs((imageData[y * width + x+1] & 0xFF) - (imageData[y * width + x-1] & 0xFF));
+                int gy = Math.abs((imageData[(y+1) * width + x] & 0xFF) - (imageData[(y-1) * width + x] & 0xFF));
 
-            for (int x = 1; x < width; x++) {
-                // Convert signed byte to unsigned int (0-255)
-                int val = imageData[y * width + x] & 0xFF;
-                boolean currentRidge = (val < 128);
-
-                if (inRidge != currentRidge) {
-                    transitions++;
-                    // Check for clean transitions
-                    if (Math.abs(val - lastVal) > 20) { // Reduced threshold
-                        cleanTransitions++;
-                    }
-                    inRidge = currentRidge;
-                }
-                lastVal = val;
+                // Gradient magnitude (simplified)
+                gradientMagnitudes[y * width + x] = gx + gy;
             }
         }
 
-        // Debug info
-        Log.d("RidgeClarity", "Transitions: " + transitions + ", Clean: " + cleanTransitions);
-        return (transitions > 0) ? (cleanTransitions * 100 / transitions) : 0;
+        // 2. Analyze ridge frequency - scan multiple rows and columns
+        int totalRidges = 0;
+        int totalValidRuns = 0;
+
+        // Scan horizontal lines at different positions
+        for (int y = height/6; y < height*5/6; y += height/12) {
+            boolean inRidge = false;
+            int runLength = 0;
+            int lastTransition = -1;
+
+            for (int x = 0; x < width; x++) {
+                boolean isRidgePixel = (imageData[y * width + x] & 0xFF) < 128;
+
+                if (isRidgePixel != inRidge) {
+                    // We have a transition
+                    if (inRidge) {
+                        // Ending a ridge
+                        if (runLength > 1 && runLength < ridgeFrequencies.length) {
+                            ridgeFrequencies[runLength]++;
+                            totalValidRuns++;
+                        }
+
+                        // Record distance between ridge starts (ridge frequency)
+                        if (lastTransition >= 0) {
+                            int ridgeDistance = x - lastTransition;
+                            totalRidges++;
+                        }
+
+                        lastTransition = x;
+                    }
+
+                    runLength = 1;
+                    inRidge = isRidgePixel;
+                } else {
+                    runLength++;
+                }
+            }
+        }
+
+        // Also scan vertical lines
+        for (int x = width/6; x < width*5/6; x += width/12) {
+            boolean inRidge = false;
+            int runLength = 0;
+
+            for (int y = 0; y < height; y++) {
+                boolean isRidgePixel = (imageData[y * width + x] & 0xFF) < 128;
+
+                if (isRidgePixel != inRidge) {
+                    // We have a transition
+                    if (inRidge && runLength > 1 && runLength < ridgeFrequencies.length) {
+                        ridgeFrequencies[runLength]++;
+                        totalValidRuns++;
+                    }
+
+                    runLength = 1;
+                    inRidge = isRidgePixel;
+                } else {
+                    runLength++;
+                }
+            }
+        }
+
+        // 3. Compute clarity statistics
+        // Strong edge responses indicate clear ridge boundaries
+        int strongEdges = 0;
+        int weakEdges = 0;
+        int noEdges = 0;
+
+        for (int i = 0; i < gradientMagnitudes.length; i++) {
+            if (gradientMagnitudes[i] > 60) strongEdges++;
+            else if (gradientMagnitudes[i] > 25) weakEdges++;
+            else noEdges++;
+        }
+
+        // 4. Calculate ridge frequency consistency
+        // Calculate the dominant ridge width and its consistency
+        int maxFreqIndex = 0;
+        int dominantRidgeWidth = 0;
+
+        for (int i = 2; i < ridgeFrequencies.length; i++) {
+            if (ridgeFrequencies[i] > maxFreqIndex) {
+                maxFreqIndex = ridgeFrequencies[i];
+                dominantRidgeWidth = i;
+            }
+        }
+
+        // Calculate score components
+
+        // Edge quality: ratio of strong edges to all detected edges
+        // Good fingerprints have a balance of strong edges and non-edges (ridges)
+        double edgeRatio = (strongEdges + weakEdges > 0) ?
+                (double)strongEdges / (strongEdges + weakEdges) : 0;
+
+        // Edge sharpness: How well-defined are the transitions between ridges?
+        double edgeSharpness = (strongEdges + weakEdges + noEdges > 0) ?
+                (double)(strongEdges * 2 + weakEdges) / (strongEdges + weakEdges + noEdges) : 0;
+
+        // Ridge frequency consistency: How consistent are ridge widths?
+        double frequencyConsistency = (totalValidRuns > 0 && maxFreqIndex > 0) ?
+                (double)maxFreqIndex / totalValidRuns : 0;
+
+        // Log debug data
+        Log.d("RidgeClarity", "StrongEdges: " + strongEdges +
+                ", WeakEdges: " + weakEdges +
+                ", EdgeRatio: " + edgeRatio +
+                ", FreqConsistency: " + frequencyConsistency);
+
+        // Calculate final score - weighted combination of factors
+        double rawScore = edgeRatio * 0.4 +
+                        edgeSharpness * 0.4 +
+                        frequencyConsistency * 0.2;
+
+        // Apply a non-linear transformation to spread out mid-range scores
+        // This creates better differentiation in the middle quality range
+        double nonLinearScore = 100 * (1 - Math.exp(-3 * rawScore));
+
+        // Apply limits
+        int finalScore = (int)Math.min(99, Math.max(5, nonLinearScore));
+
+        Log.d("RidgeClarity", "Raw score: " + rawScore + ", Final score: " + finalScore);
+
+        return finalScore;
     }
 
-    private float calculateEdgeQuality(byte[] imageData, int width, int height) {
+    private int calculateEdgeQuality(byte[] imageData, int width, int height) {
         byte[] edges = new byte[width * height];
 
         // Apply simple edge detection
@@ -241,7 +349,9 @@ public class FPSecugen extends CordovaPlugin {
         }
 
         // Good ratio of strong to weak edges indicates clear pattern
-        return strongEdges > 0 ? (float)strongEdges / (strongEdges + weakEdges) * 100 : 0;
+        float total = strongEdges > 0 ? (float)strongEdges / (strongEdges + weakEdges) * 100 : 0;
+
+        return Math.round(total);
     }
 
     private int assessPatternContinuity(byte[] imageData, int width, int height) {
@@ -286,7 +396,7 @@ public class FPSecugen extends CordovaPlugin {
     private int calculateConsistencyScore(int[] widths, int count) {
         if (count < 3) {
             Log.d("ConsistencyScore", "Not enough samples: " + count);
-            return 0; // Not enough data points
+            return 0;
         }
 
         // Calculate mean
@@ -316,29 +426,19 @@ public class FPSecugen extends CordovaPlugin {
         return score;
     }
 
-    // Replace the existing finalScore method with this improved version
-    private int finalScore(long nistScore, int imageQuality, byte[] imageData) {
-        if (nistScore < 0) {
-            return 0;
+    private int betterNistScore(long nistScore, int imageQuality) {
+        // Map NIST score to a 0-100 scale
+        // Assuming NIST scores are in the range of 1-5, where lower is better
+        // and imageQuality is in the range of 0-100
+        if (nistScore < 1 || nistScore > 3) {
+            return 0; // Invalid or terrible NIST score
         }
 
-        // Calculate additional quality metrics
-        int ridgeClarity = analyzeRidgeClarity(imageData, mImageWidth, mImageHeight);
-        float edgeQuality = calculateEdgeQuality(imageData, mImageWidth, mImageHeight);
-        int patternContinuity = assessPatternContinuity(imageData, mImageWidth, mImageHeight);
-
-        // Normalize NIST score (lower is better in NIST)
+        // Normalize NIST score to a 0-100 scale
         float normalizedNist = (6 - nistScore) * 20; // Convert to 0-100 scale
 
-        // Weighted combination with reduced emphasis on pure darkness
-        float combinedScore =
-            imageQuality * 0.40f +          // Basic darkness
-            normalizedNist * 0.25f +        // Standard quality measure
-            ridgeClarity * 0.05f +          // Ridge clarity (important for clean lines)
-            edgeQuality * 0.25f +           // Edge quality (important for vectors)
-            patternContinuity * 0.05f;      // Pattern consistency
-
-        return Math.round(combinedScore);
+        // Combine with image quality
+        return Math.round((normalizedNist + imageQuality) / 2);
     }
 
     /*private void openDevice() {
@@ -572,16 +672,25 @@ public class FPSecugen extends CordovaPlugin {
                 fingerInfo.ImpressionType = SGImpressionType.SG_IMPTYPE_NP;
                 fingerInfo.ViewNumber = 1;
 
+                int betterNistScore = betterNistScore(nistScore, fingerInfo.ImageQuality);
+
                 // Calculate metrics for better vectorisation quality assessment
                 int ridgeClarity = analyzeRidgeClarity(buffer, mImageWidth, mImageHeight);
-                float edgeQuality = calculateEdgeQuality(buffer, mImageWidth, mImageHeight);
+                int edgeQuality = calculateEdgeQuality(buffer, mImageWidth, mImageHeight);
                 int patternContinuity = assessPatternContinuity(buffer, mImageWidth, mImageHeight);
 
-                // Use improved final score calculation
-                int finalScore = finalScore(nistScore, fingerInfo.ImageQuality, buffer);
+                // Weighted combination with reduced emphasis on pure darkness
+                float combinedScore =
+                        fingerInfo.ImageQuality * 0.10f +  // Basic darkness
+                        betterNistScore * 0.35f +        // Standard quality measure
+                        ridgeClarity * 0.40f +          // Ridge clarity (important for clean lines)
+                        edgeQuality * 0.10f +           // Edge quality (important for vectors)
+                        patternContinuity * 0.05f;      // Pattern consistency
+
+                int finalScore = Math.round(combinedScore);
 
                 Log.d("FP Image Quality", fingerInfo.ImageQuality + "");
-                Log.d("FP NIST Score", nistScore + "");
+                Log.d("FP NIST Score", nistScore + "-" + betterNistScore + "");
                 Log.d("FP Ridge Clarity", ridgeClarity + "");
                 Log.d("FP Edge Quality", edgeQuality + "");
                 Log.d("FP Pattern Continuity", patternContinuity + "");
@@ -629,7 +738,7 @@ public class FPSecugen extends CordovaPlugin {
                                 json.put("wsqImage", wsqEncoded);
                                 json.put("errorCode", 0);
                                 json.put("quality", fingerInfo.ImageQuality);
-                                json.put("nistScore", nistScore);
+                                json.put("nistScore", betterNistScore);
                                 json.put("ridgeClarity", ridgeClarity);
                                 json.put("edgeQuality", edgeQuality);
                                 json.put("patternContinuity", patternContinuity);
@@ -700,6 +809,160 @@ public class FPSecugen extends CordovaPlugin {
         Log.d("Cordova FP", message);
     }
 
+    /**
+     * Analyzes how much of the canvas is covered by an actual fingerprint pattern.
+     * This method distinguishes between random dark pixels and structured fingerprint patterns
+     * by analyzing local neighborhoods for ridge-like structures
+     *
+     * @param imageData The raw fingerprint image data
+     * @param width The width of the image
+     * @param height The height of the image
+     * @return A score from 0-100 indicating fingerprint coverage percentage
+     */
+    private int analyzeFingerPrintCoverage(byte[] imageData, int width, int height) {
+        // We'll divide the image into a grid of cells and check each for fingerprint pattern
+        int cellSize = 16; // Size of each cell to analyze
+        int cellsX = width / cellSize;
+        int cellsY = height / cellSize;
+        int totalCells = cellsX * cellsY;
+        int cellsWithFingerprint = 0;
+
+        // Thresholds for fingerprint pattern detection
+        final int MIN_DARK_PIXELS = (int)(cellSize * cellSize * 0.2);  // Min 20% dark pixels
+        final int MIN_TRANSITIONS = 3;  // Minimum ridge transitions to consider a fingerprint pattern
+        final int DARK_THRESHOLD = 128; // Threshold for dark vs light pixels
+
+        // Check each cell for fingerprint patterns
+        for (int cellY = 0; cellY < cellsY; cellY++) {
+            for (int cellX = 0; cellX < cellsX; cellX++) {
+                int startX = cellX * cellSize;
+                int startY = cellY * cellSize;
+
+                // Count dark pixels in this cell
+                int darkPixels = 0;
+                for (int y = startY; y < startY + cellSize && y < height; y++) {
+                    for (int x = startX; x < startX + cellSize && x < width; x++) {
+                        if ((imageData[y * width + x] & 0xFF) < DARK_THRESHOLD) {
+                            darkPixels++;
+                        }
+                    }
+                }
+
+                // Only analyze cells with sufficient dark content
+                if (darkPixels > MIN_DARK_PIXELS) {
+                    // Check for ridge patterns - horizontal scan
+                    int hTransitions = countRidgeTransitions(imageData, startX, startY,
+                                                            cellSize, width, height, true);
+
+                    // Check for ridge patterns - vertical scan
+                    int vTransitions = countRidgeTransitions(imageData, startX, startY,
+                                                            cellSize, width, height, false);
+
+                    // Cells with ridge transitions in both directions are likely fingerprint patterns
+                    if (hTransitions >= MIN_TRANSITIONS && vTransitions >= MIN_TRANSITIONS) {
+                        cellsWithFingerprint++;
+                    }
+                    // Cells with strong directional pattern are also likely fingerprint
+                    else if (hTransitions >= MIN_TRANSITIONS * 2 || vTransitions >= MIN_TRANSITIONS * 2) {
+                        cellsWithFingerprint++;
+                    }
+                }
+            }
+        }
+
+        // Calculate coverage percentage
+        double coverage = (double)cellsWithFingerprint / totalCells;
+
+        // Apply scoring logic
+        int coverageScore;
+
+        if (coverage < 0.2) {
+            // Less than 20% coverage - linear score from 0-50
+            coverageScore = (int)(coverage * 250);
+        } else if (coverage < 0.5) {
+            // 20-50% coverage - linear score from 50-80
+            coverageScore = (int)(50 + ((coverage - 0.2) / 0.3) * 30);
+        } else if (coverage < 0.7) {
+            // 50-70% coverage - linear score from 80-95
+            coverageScore = (int)(80 + ((coverage - 0.5) / 0.2) * 15);
+        } else {
+            // 70-100% coverage - linear score from 95-100
+            coverageScore = (int)(95 + ((coverage - 0.7) / 0.3) * 5);
+        }
+
+        Log.d("CoverageAnalysis",
+              String.format("Cells with fingerprint: %d/%d (%.1f%%), Score: %d",
+                           cellsWithFingerprint, totalCells, coverage * 100, coverageScore));
+
+        return Math.min(100, Math.max(0, coverageScore));
+    }
+
+    /**
+     * Helper method to count ridge transitions along a line
+     *
+     * @param imageData The raw image data
+     * @param startX Starting X coordinate of the scan
+     * @param startY Starting Y coordinate of the scan
+     * @param length Length of the scan
+     * @param width Image width
+     * @param height Image height
+     * @param horizontal If true, scan horizontally, otherwise vertically
+     * @return Number of ridge transitions detected
+     */
+    private int countRidgeTransitions(byte[] imageData, int startX, int startY, int length,
+                                     int width, int height, boolean horizontal) {
+        int transitions = 0;
+        boolean inRidge = false;
+        int runLength = 0;
+        int minRunLength = 2; // Minimum run length to count as valid ridge/valley
+
+        if (horizontal) {
+            // Scan horizontally along the middle of the cell
+            int y = startY + length/2;
+            if (y >= height) y = height - 1;
+
+            // Initialize the first pixel state
+            inRidge = (imageData[y * width + startX] & 0xFF) < 128;
+
+            for (int x = startX; x < startX + length && x < width; x++) {
+                boolean isRidge = (imageData[y * width + x] & 0xFF) < 128;
+
+                if (isRidge == inRidge) {
+                    runLength++;
+                } else {
+                    if (runLength >= minRunLength) {
+                        transitions++;
+                    }
+                    inRidge = isRidge;
+                    runLength = 1;
+                }
+            }
+        } else {
+            // Scan vertically along the middle of the cell
+            int x = startX + length/2;
+            if (x >= width) x = width - 1;
+
+            // Initialize the first pixel state
+            inRidge = (imageData[startY * width + x] & 0xFF) < 128;
+
+            for (int y = startY; y < startY + length && y < height; y++) {
+                boolean isRidge = (imageData[y * width + x] & 0xFF) < 128;
+
+                if (isRidge == inRidge) {
+                    runLength++;
+                } else {
+                    if (runLength >= minRunLength) {
+                        transitions++;
+                    }
+                    inRidge = isRidge;
+                    runLength = 1;
+                }
+            }
+        }
+
+        return transitions;
+    }
+
     public class UsbBroadcastReceiver extends BroadcastReceiver {
         // logging tag
         private final String TAG = "UsbBroadcastReceiver";
@@ -756,4 +1019,3 @@ public class FPSecugen extends CordovaPlugin {
         }
     }
 }
-
