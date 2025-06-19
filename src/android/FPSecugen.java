@@ -679,15 +679,19 @@ public class FPSecugen extends CordovaPlugin {
                 int edgeQuality = calculateEdgeQuality(buffer, mImageWidth, mImageHeight);
                 int patternContinuity = assessPatternContinuity(buffer, mImageWidth, mImageHeight);
 
-                // Weighted combination with reduced emphasis on pure darkness
-                float combinedScore =
-                        fingerInfo.ImageQuality * 0.10f +  // Basic darkness
-                        betterNistScore * 0.35f +        // Standard quality measure
-                        ridgeClarity * 0.40f +          // Ridge clarity (important for clean lines)
-                        edgeQuality * 0.10f +           // Edge quality (important for vectors)
-                        patternContinuity * 0.05f;      // Pattern consistency
+                // If any of the scores are below 10 set the final score to 0
+                int finalScore = 0;
+                if (ridgeClarity >= 10 && edgeQuality >= 10 && patternContinuity >= 10) {
+                    // Weighted combination with reduced emphasis on pure darkness
+                    float combinedScore =
+                            fingerInfo.ImageQuality * 0.10f +  // Basic darkness
+                                    betterNistScore * 0.35f +        // Standard quality measure
+                                    ridgeClarity * 0.40f +          // Ridge clarity (important for clean lines)
+                                    edgeQuality * 0.10f +           // Edge quality (important for vectors)
+                                    patternContinuity * 0.05f;      // Pattern consistency
 
-                int finalScore = Math.round(combinedScore);
+                    finalScore = Math.round(combinedScore);
+                }
 
                 Log.d("FP Image Quality", fingerInfo.ImageQuality + "");
                 Log.d("FP NIST Score", nistScore + "-" + betterNistScore + "");
@@ -1019,3 +1023,4 @@ public class FPSecugen extends CordovaPlugin {
         }
     }
 }
+
