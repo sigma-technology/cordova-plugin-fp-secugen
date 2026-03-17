@@ -484,45 +484,117 @@ public class FPSecugen extends CordovaPlugin {
         cordova.getThreadPool().execute(new Runnable() {
             @Override
             public void run() {
+                Log.d(TAG, "requestPermission2: start");
                 manager = (UsbManager) cordova.getActivity().getSystemService(Context.USB_SERVICE);
-                sgfplib = new JSGFPLib((Context) cordova.getActivity().getBaseContext(), (UsbManager) context.getSystemService(Context.USB_SERVICE));
 
-                mLed = false;
+                // Find the SecuGen USB device directly via UsbManager WITHOUT calling Init() first.
+                // On Android 14+, Init() internally tries to open the USB device and hangs
+                // indefinitely when USB permission has not yet been granted.
+                UsbDevice usbDevice = findSecuGenDevice(manager);
+                Log.d(TAG, "requestPermission2: findSecuGenDevice returned " + (usbDevice != null ? usbDevice.getDeviceName() : "null"));
 
-                long error = sgfplib.Init(SGFDxDeviceName.SG_DEV_AUTO);
-                if (error != SGFDxErrorCode.SGFDX_ERROR_NONE) {
-                    String message = "Fingerprint device initialization failed!";
-                    if (error == SGFDxErrorCode.SGFDX_ERROR_DEVICE_NOT_FOUND) {
-                        message = "Error: Either a fingerprint device is not attached or the attached fingerprint device is not supported.";
-                    }
+                if (usbDevice == null) {
+                    String message = "Error: Either a fingerprint device is not attached or the attached fingerprint device is not supported.";
                     debugMessage(message);
+                    Log.e(TAG, "requestPermission2: " + message);
                     PluginResult result = new PluginResult(PluginResult.Status.ERROR, message);
                     result.setKeepCallback(true);
                     callbackContext.sendPluginResult(result);
-                } else {
-                    UsbDevice usbDevice = sgfplib.GetUsbDevice();
-                    if (usbDevice == null) {
-                        String message = "Error: Fingerprint sensor not found!";
-                        debugMessage(message);
-                        PluginResult result = new PluginResult(PluginResult.Status.ERROR, message);
-                        result.setKeepCallback(true);
-                        callbackContext.sendPluginResult(result);
-                    }
+                    return;
+                }
 
-                    // create the intent that will be used to get the permission
-                    PendingIntent pendingIntent = PendingIntent.getBroadcast(cordova.getActivity(), 0, new Intent(UsbBroadcastReceiver.USB_PERMISSION), PendingIntent.FLAG_MUTABLE);
-                    // and a filter on the permission we ask
+                if (manager.hasPermission(usbDevice)) {
+                    // Permission already granted - init and open immediately
+                    Log.d(TAG, "requestPermission2: USB permission already granted, calling initSgfplibAndOpenDevice()");
+                    initSgfplibAndOpenDevice(callbackContext);
+                } else {
+                    // Need to ask the user for permission
+                    Log.d(TAG, "requestPermission2: USB permission not yet granted, requesting...");
+
+                    // The Intent must be explicit (package set) on Android 14+ otherwise
+                    // UsbManager.requestPermission() silently drops the dialog.
+                    Intent permissionIntent = new Intent(UsbBroadcastReceiver.USB_PERMISSION);
+                    permissionIntent.setPackage(cordova.getActivity().getPackageName());
+
+                    // FLAG_MUTABLE is required here so UsbManager can attach the UsbDevice extra
+                    // to the broadcast it sends back to us. FLAG_ALLOW_UNSAFE_IMPLICIT_INTENT is
+                    // not needed because we have made the intent explicit above.
+                    int piFlags;
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                        piFlags = PendingIntent.FLAG_MUTABLE | PendingIntent.FLAG_UPDATE_CURRENT;
+                    } else {
+                        piFlags = PendingIntent.FLAG_UPDATE_CURRENT;
+                    }
+                    PendingIntent pendingIntent = PendingIntent.getBroadcast(
+                            cordova.getActivity(),
+                            0,
+                            permissionIntent,
+                            piFlags
+                    );
+
                     IntentFilter filter = new IntentFilter();
                     filter.addAction(UsbBroadcastReceiver.USB_PERMISSION);
-                    // this broadcast receiver will handle the permission results
                     usbReceiver = new UsbBroadcastReceiver(callbackContext, cordova.getActivity());
-                    cordova.getActivity().registerReceiver(usbReceiver, filter);
-                    // finally ask for the permission
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                        cordova.getActivity().registerReceiver(usbReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
+                    } else {
+                        cordova.getActivity().registerReceiver(usbReceiver, filter);
+                    }
                     manager.requestPermission(usbDevice, pendingIntent);
-//                    initDeviceSettings();
+                    Log.d(TAG, "requestPermission2: requestPermission() called, waiting for user response");
                 }
             }
         });
+    }
+
+    /**
+     * Finds the first connected SecuGen fingerprint device using UsbManager directly,
+     * without calling sgfplib.Init() which can hang on Android 14+ before permission is granted.
+     * SecuGen devices use vendor ID 0x1162.
+     */
+    private UsbDevice findSecuGenDevice(UsbManager usbManager) {
+        final int SECUGEN_VENDOR_ID = 0x1162;
+        for (UsbDevice device : usbManager.getDeviceList().values()) {
+            Log.d(TAG, "findSecuGenDevice: found USB device vendorId=" + device.getVendorId() + " productId=" + device.getProductId() + " name=" + device.getDeviceName());
+            if (device.getVendorId() == SECUGEN_VENDOR_ID) {
+                Log.d(TAG, "findSecuGenDevice: matched SecuGen device: " + device.getDeviceName());
+                return device;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Creates the sgfplib instance, calls Init() and then OpenDevice() via initDeviceSettings().
+     * Must only be called AFTER USB permission has been granted.
+     */
+    private void initSgfplibAndOpenDevice(final CallbackContext callbackContext) {
+        Log.d(TAG, "initSgfplibAndOpenDevice: creating JSGFPLib and calling Init()");
+        sgfplib = new JSGFPLib((Context) cordova.getActivity().getBaseContext(), (UsbManager) context.getSystemService(Context.USB_SERVICE));
+        mLed = false;
+
+        long error = sgfplib.Init(SGFDxDeviceName.SG_DEV_AUTO);
+        Log.d(TAG, "initSgfplibAndOpenDevice: Init() returned " + error);
+        if (error != SGFDxErrorCode.SGFDX_ERROR_NONE) {
+            String message = "Fingerprint device initialization failed!";
+            if (error == SGFDxErrorCode.SGFDX_ERROR_DEVICE_NOT_FOUND) {
+                message = "Error: Either a fingerprint device is not attached or the attached fingerprint device is not supported.";
+            }
+            debugMessage(message);
+            Log.e(TAG, "initSgfplibAndOpenDevice: Init() failed - " + message);
+            PluginResult result = new PluginResult(PluginResult.Status.ERROR, message);
+            result.setKeepCallback(true);
+            callbackContext.sendPluginResult(result);
+            return;
+        }
+
+        Log.d(TAG, "initSgfplibAndOpenDevice: Init() succeeded, calling initDeviceSettings()");
+        initDeviceSettings();
+        Log.d(TAG, "initSgfplibAndOpenDevice: initDeviceSettings() complete, bSecuGenDeviceOpened=" + bSecuGenDeviceOpened);
+
+        PluginResult result = new PluginResult(PluginResult.Status.OK, "Permission granted");
+        result.setKeepCallback(true);
+        callbackContext.sendPluginResult(result);
     }
 
     private void exitApplication() {
@@ -530,13 +602,16 @@ public class FPSecugen extends CordovaPlugin {
     }
 
     public void initDeviceSettings() {
+        Log.d(TAG, "initDeviceSettings: start, sgfplib=" + (sgfplib != null ? "not null" : "NULL"));
         long error;
-//        openDeviceRequestCount++;
+        Log.d(TAG, "initDeviceSettings: calling OpenDevice(0)...");
         error = sgfplib.OpenDevice(0);
         debugMessage("OpenDevice() ret: " + error + "\n");
+        Log.d(TAG, "initDeviceSettings: OpenDevice(0) returned " + error);
         boolean isOpened = error == SGFDxErrorCode.SGFDX_ERROR_NONE;
 
         if (!isOpened) {
+            Log.e(TAG, "initDeviceSettings: OpenDevice failed with error " + error);
             //init setting again...
             /*if(openDeviceRequestCount < 40) {
                 initDeviceSettings();
@@ -549,42 +624,73 @@ public class FPSecugen extends CordovaPlugin {
 
             return;
         } else {
+            Log.d(TAG, "initDeviceSettings: Device opened successfully");
             debugMessage("Device opened successfully");
-//            openDeviceRequestCount = 0;
+            bSecuGenDeviceOpened = true;
         }
 
-//        boolean deviceInUse = sgfplib.DeviceInUse();
-//        debugMessage("Device In Use  =" + deviceInUse+"");
+        Log.d(TAG, "initDeviceSettings: calling GetDeviceInfo()...");
         SecuGen.FDxSDKPro.SGDeviceInfoParam deviceInfo = new SecuGen.FDxSDKPro.SGDeviceInfoParam();
         error = sgfplib.GetDeviceInfo(deviceInfo);
         debugMessage("GetDeviceInfo() ret: " + error + "\n");
+        Log.d(TAG, "initDeviceSettings: GetDeviceInfo() returned " + error);
         mImageWidth = deviceInfo.imageWidth;
         mImageHeight = deviceInfo.imageHeight;
         serialNumber = new String(deviceInfo.deviceSN());
         debugMessage("Setting props: mImageWidth: " + mImageWidth + " mImageHeight: " + mImageHeight);
+        Log.d(TAG, "initDeviceSettings: mImageWidth=" + mImageWidth + " mImageHeight=" + mImageHeight + " serialNumber=" + serialNumber);
         props = new ScanProperties(mImageWidth, mImageHeight);
-//                  sgfplib.SetTemplateFormat(SGFDxTemplateFormat.TEMPLATE_FORMAT_ISO19794);
-//                  sgfplib.SetTemplateFormat(SGFDxTemplateFormat.TEMPLATE_FORMAT_SG400);
         Field fieldName;
         try {
-            fieldName = SGFDxTemplateFormat.class.getField(FPSecugen.getTemplateFormat());
+            String templateFormatName = FPSecugen.getTemplateFormat();
+            if (templateFormatName == null || templateFormatName.isEmpty()) {
+                templateFormatName = "TEMPLATE_FORMAT_ANSI378";
+                Log.w(TAG, "initDeviceSettings: templateFormat not configured, defaulting to " + templateFormatName);
+            }
+            Log.d(TAG, "initDeviceSettings: setting template format: " + templateFormatName);
+            fieldName = SGFDxTemplateFormat.class.getField(templateFormatName);
             short templateValue = fieldName.getShort(null);
             debugMessage("templateValue: " + templateValue);
+            Log.d(TAG, "initDeviceSettings: calling SetTemplateFormat(" + templateValue + ")...");
             sgfplib.SetTemplateFormat(templateValue);
+            Log.d(TAG, "initDeviceSettings: SetTemplateFormat() done");
         } catch (NoSuchFieldException e) {
-            // TODO Auto-generated catch block
+            Log.e(TAG, "initDeviceSettings: NoSuchFieldException in SetTemplateFormat", e);
             e.printStackTrace();
         } catch (IllegalAccessException e) {
-            // TODO Auto-generated catch block
+            Log.e(TAG, "initDeviceSettings: IllegalAccessException in SetTemplateFormat", e);
             e.printStackTrace();
         } catch (IllegalArgumentException e) {
-            // TODO Auto-generated catch block
+            Log.e(TAG, "initDeviceSettings: IllegalArgumentException in SetTemplateFormat", e);
             e.printStackTrace();
         }
+        Log.d(TAG, "initDeviceSettings: calling GetMaxTemplateSize()...");
         sgfplib.GetMaxTemplateSize(mMaxTemplateSize);
         debugMessage("mMaxTemplateSize: " + mMaxTemplateSize[0] + "\n");
+        Log.d(TAG, "initDeviceSettings: mMaxTemplateSize=" + mMaxTemplateSize[0]);
         mRegisterTemplate = new byte[mMaxTemplateSize[0]];
-        sgfplib.writeData((byte) 5, (byte) 1);
+
+        // Activate the LED. On Android 14+ the USB control transfer can fail immediately
+        // after OpenDevice() if the interface is not yet fully ready, so we retry with a
+        // short delay before each attempt.
+        Log.d(TAG, "initDeviceSettings: activating LED (writeData 5,1)...");
+        long writeError = SGFDxErrorCode.SGFDX_ERROR_NONE + 1; // start as non-zero
+        for (int attempt = 1; attempt <= 3; attempt++) {
+            try {
+                Thread.sleep(100L * attempt); // 100ms, 200ms, 300ms
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            writeError = sgfplib.writeData((byte) 5, (byte) 1);
+            Log.d(TAG, "initDeviceSettings: writeData(5,1) attempt " + attempt + " returned " + writeError);
+            if (writeError == SGFDxErrorCode.SGFDX_ERROR_NONE) {
+                Log.d(TAG, "initDeviceSettings: LED activated successfully on attempt " + attempt);
+                break;
+            }
+        }
+        if (writeError != SGFDxErrorCode.SGFDX_ERROR_NONE) {
+            Log.w(TAG, "initDeviceSettings: LED activation failed after 3 attempts (error " + writeError + ") - scanner may still function");
+        }
     }
 
     private void closeDevice() {
@@ -1002,25 +1108,58 @@ public class FPSecugen extends CordovaPlugin {
          * @param intent
          * @see android.content.BroadcastReceiver#onReceive(android.content.Context, android.content.Intent)
          */
+//        @Override
+//        public void onReceive(Context context, Intent intent) {
+//            String action = intent.getAction();
+//            if (USB_PERMISSION.equals(action)) {
+//                // deal with the user answer about the permission
+//                if (intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)) {
+//                    Log.d(TAG, "Permission to connect to the device was accepted!");
+//                    initDeviceSettings();
+//                    if (callbackContext != null)
+//                        callbackContext.success("Permission to connect to the device was accepted!");
+//                } else {
+//                    Log.d(TAG, "Permission to connect to the device was denied!");
+//                    if (callbackContext != null)
+//                        callbackContext.error("Permission to connect to the device was denied!");
+//                }
+//                // unregister the broadcast receiver since it's no longer needed
+//                activity.unregisterReceiver(this);
+//            }
+//        }
         @Override
         public void onReceive(Context context, Intent intent) {
             String action = intent.getAction();
+            Log.d(TAG, "onReceive: action=" + action);
             if (USB_PERMISSION.equals(action)) {
-                // deal with the user answer about the permission
-                if (intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)) {
-                    Log.d(TAG, "Permission to connect to the device was accepted!");
-                    initDeviceSettings();
-                    if (callbackContext != null)
-                        callbackContext.success("Permission to connect to the device was accepted!");
-                } else {
-                    Log.d(TAG, "Permission to connect to the device was denied!");
-                    if (callbackContext != null)
-                        callbackContext.error("Permission to connect to the device was denied!");
+                synchronized (this) {
+                    UsbDevice device = (UsbDevice) intent.getParcelableExtra(UsbManager.EXTRA_DEVICE);
+                    boolean permissionGranted = intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false);
+                    Log.d(TAG, "onReceive: permissionGranted=" + permissionGranted + ", device=" + (device != null ? device.getDeviceName() : "null"));
+                    if (permissionGranted) {
+                        // Must run Init() and OpenDevice() on a background thread after permission is granted.
+                        // Init() was intentionally NOT called before the permission dialog to avoid
+                        // it hanging on Android 14+ before USB permission is granted.
+                        Log.d(TAG, "Launching initSgfplibAndOpenDevice on background thread");
+                        cordova.getThreadPool().execute(new Runnable() {
+                            @Override
+                            public void run() {
+                                Log.d(TAG, "Background thread: calling initSgfplibAndOpenDevice()");
+                                initSgfplibAndOpenDevice(callbackContext);
+                                Log.d(TAG, "Background thread: initSgfplibAndOpenDevice() complete");
+                            }
+                        });
+                    } else {
+                        Log.e(TAG, "USB permission denied by user");
+                        PluginResult result = new PluginResult(PluginResult.Status.ERROR, "USB permission denied");
+                        result.setKeepCallback(true);
+                        callbackContext.sendPluginResult(result);
+                    }
                 }
-                // unregister the broadcast receiver since it's no longer needed
+                // Unregister the broadcast receiver since it's no longer needed
+                Log.d(TAG, "Unregistering USB broadcast receiver");
                 activity.unregisterReceiver(this);
             }
         }
     }
 }
-
