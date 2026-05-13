@@ -10,14 +10,15 @@ Customised for Fingerprint Scanner App
 1.  Add the plugin in your project **cordova plugin add sigma-technology/cordova-plugin-fp-secugen**
 2.  You have to request for jar and .so files from Secugen Website. They ask a valid email id and send android sdk to this email.
 3.  Copy complete **libs folder** from the provided zip file to your projects **android/app/libs** folder.  
-4.  Also add **FDxSDKProFDAndroid.jar** file from zip sdk file to the your projects **android/app/libs** folder.
-5.  Now add **FDxSDKProFDAndroid.jar** and ***.so** to dependencies in **android/app/build.gradle** file (replacing the first line to also include .so files) eg:
+4.  Also add **FDxSDKProFDAndroid.jar** and **AICamera.jar** files from zip sdk file to the your projects **android/app/libs** folder.
+5.  Now add **FDxSDKProFDAndroid.jar**, **AICamera.jar** and ***.so** to dependencies in **android/app/build.gradle** file (replacing the first line to also include .so files) eg:
 
 ``` 
 dependencies {
     implementation fileTree(dir: 'libs', include: ['*.jar', '*.so'])
     // Other dependencies
     implementation files('libs/FDxSDKProFDAndroid.jar')
+    implementation files('libs/AICamera.jar')
 }
 ```
 
