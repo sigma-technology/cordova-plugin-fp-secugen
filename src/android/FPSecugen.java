@@ -85,7 +85,7 @@ public class FPSecugen extends CordovaPlugin {
     // UsbManager instance to deal with permission and opening
     private UsbManager manager;
 
-    //    private AfisEngine afis;
+    // private AfisEngine afis;
     private ScanProperties props;
     private PendingIntent mPermissionIntent;
     private boolean usbPermissionRequested;
@@ -104,32 +104,39 @@ public class FPSecugen extends CordovaPlugin {
         File templatePathFile = new File(templatePath);
         templatePathFile.mkdirs();
         FPSecugen.setTemplatePath(path);
-        // LOG.d(TAG,"this.cordova.getActivity().getPackageName(): " + this.cordova.getActivity().getPackageName());
-        // int id = context.getResources().getIdentifier("templatePath", "string", this.cordova.getActivity().getPackageName());
+        // LOG.d(TAG,"this.cordova.getActivity().getPackageName(): " +
+        // this.cordova.getActivity().getPackageName());
+        // int id = context.getResources().getIdentifier("templatePath", "string",
+        // this.cordova.getActivity().getPackageName());
         // LOG.d(TAG,"templatePath id: " + id);
         // String translatedValue = context.getResources().getString(id);
         // LOG.d(TAG,"translatedValue: " + translatedValue);
         // File templatePathFile = new File(templatePath);
         // templatePathFile.mkdirs();
         // SecugenPlugin.setTemplatePath(translatedValue);
-        // id = context.getResources().getIdentifier("serverUrl", "string", this.cordova.getActivity().getPackageName());
+        // id = context.getResources().getIdentifier("serverUrl", "string",
+        // this.cordova.getActivity().getPackageName());
         // LOG.d(TAG,"serverUrl id: " + id);
         // String serverUrl = context.getResources().getString(id);
         // LOG.d(TAG,"serverUrl: " + serverUrl);
         // SecugenPlugin.setServerUrl(serverUrl);
-        // id = context.getResources().getIdentifier("serverKey", "string", this.cordova.getActivity().getPackageName());
+        // id = context.getResources().getIdentifier("serverKey", "string",
+        // this.cordova.getActivity().getPackageName());
         // String serverKey = context.getResources().getString(id);
         // LOG.d(TAG,"serverKey: " + serverKey);
         // SecugenPlugin.setServerKey(serverKey);
-        // id = context.getResources().getIdentifier("projectName", "string", this.cordova.getActivity().getPackageName());
+        // id = context.getResources().getIdentifier("projectName", "string",
+        // this.cordova.getActivity().getPackageName());
         // String projectName = context.getResources().getString(id);
         // LOG.d(TAG,"projectName: " + projectName);
         // SecugenPlugin.setProjectName(projectName);
-        // id = context.getResources().getIdentifier("templateFormat", "string", this.cordova.getActivity().getPackageName());
+        // id = context.getResources().getIdentifier("templateFormat", "string",
+        // this.cordova.getActivity().getPackageName());
         // String templateFormat = context.getResources().getString(id);
         // LOG.d(TAG,"templateFormat: " + templateFormat);
         // SecugenPlugin.setTemplateFormat(templateFormat);
-        // id = context.getResources().getIdentifier("serverUrlFilepath", "string", this.cordova.getActivity().getPackageName());
+        // id = context.getResources().getIdentifier("serverUrlFilepath", "string",
+        // this.cordova.getActivity().getPackageName());
         // LOG.d(TAG,"serverUrlFilepath id: " + id);
         // String serverUrlFilepath = context.getResources().getString(id);
         // LOG.d(TAG,"serverUrlFilepath: " + serverUrlFilepath);
@@ -185,7 +192,8 @@ public class FPSecugen extends CordovaPlugin {
     private int analyzeRidgeClarity(byte[] imageData, int width, int height) {
         // New approach: Analyze edge response variance and ridge frequency distribution
 
-        // 1. Compute horizontal and vertical gradient magnitudes using Sobel-like operators
+        // 1. Compute horizontal and vertical gradient magnitudes using Sobel-like
+        // operators
         int[] gradientMagnitudes = new int[width * height];
         int[] ridgeFrequencies = new int[30]; // Store frequencies of different ridge widths
 
@@ -193,8 +201,8 @@ public class FPSecugen extends CordovaPlugin {
         for (int y = 2; y < height - 2; y++) {
             for (int x = 2; x < width - 2; x++) {
                 // Simple horizontal and vertical gradients
-                int gx = Math.abs((imageData[y * width + x+1] & 0xFF) - (imageData[y * width + x-1] & 0xFF));
-                int gy = Math.abs((imageData[(y+1) * width + x] & 0xFF) - (imageData[(y-1) * width + x] & 0xFF));
+                int gx = Math.abs((imageData[y * width + x + 1] & 0xFF) - (imageData[y * width + x - 1] & 0xFF));
+                int gy = Math.abs((imageData[(y + 1) * width + x] & 0xFF) - (imageData[(y - 1) * width + x] & 0xFF));
 
                 // Gradient magnitude (simplified)
                 gradientMagnitudes[y * width + x] = gx + gy;
@@ -206,7 +214,7 @@ public class FPSecugen extends CordovaPlugin {
         int totalValidRuns = 0;
 
         // Scan horizontal lines at different positions
-        for (int y = height/6; y < height*5/6; y += height/12) {
+        for (int y = height / 6; y < height * 5 / 6; y += height / 12) {
             boolean inRidge = false;
             int runLength = 0;
             int lastTransition = -1;
@@ -241,7 +249,7 @@ public class FPSecugen extends CordovaPlugin {
         }
 
         // Also scan vertical lines
-        for (int x = width/6; x < width*5/6; x += width/12) {
+        for (int x = width / 6; x < width * 5 / 6; x += width / 12) {
             boolean inRidge = false;
             int runLength = 0;
 
@@ -270,9 +278,12 @@ public class FPSecugen extends CordovaPlugin {
         int noEdges = 0;
 
         for (int i = 0; i < gradientMagnitudes.length; i++) {
-            if (gradientMagnitudes[i] > 60) strongEdges++;
-            else if (gradientMagnitudes[i] > 25) weakEdges++;
-            else noEdges++;
+            if (gradientMagnitudes[i] > 60)
+                strongEdges++;
+            else if (gradientMagnitudes[i] > 25)
+                weakEdges++;
+            else
+                noEdges++;
         }
 
         // 4. Calculate ridge frequency consistency
@@ -291,16 +302,16 @@ public class FPSecugen extends CordovaPlugin {
 
         // Edge quality: ratio of strong edges to all detected edges
         // Good fingerprints have a balance of strong edges and non-edges (ridges)
-        double edgeRatio = (strongEdges + weakEdges > 0) ?
-                (double)strongEdges / (strongEdges + weakEdges) : 0;
+        double edgeRatio = (strongEdges + weakEdges > 0) ? (double) strongEdges / (strongEdges + weakEdges) : 0;
 
         // Edge sharpness: How well-defined are the transitions between ridges?
-        double edgeSharpness = (strongEdges + weakEdges + noEdges > 0) ?
-                (double)(strongEdges * 2 + weakEdges) / (strongEdges + weakEdges + noEdges) : 0;
+        double edgeSharpness = (strongEdges + weakEdges + noEdges > 0)
+                ? (double) (strongEdges * 2 + weakEdges) / (strongEdges + weakEdges + noEdges)
+                : 0;
 
         // Ridge frequency consistency: How consistent are ridge widths?
-        double frequencyConsistency = (totalValidRuns > 0 && maxFreqIndex > 0) ?
-                (double)maxFreqIndex / totalValidRuns : 0;
+        double frequencyConsistency = (totalValidRuns > 0 && maxFreqIndex > 0) ? (double) maxFreqIndex / totalValidRuns
+                : 0;
 
         // Log debug data
         Log.d("RidgeClarity", "StrongEdges: " + strongEdges +
@@ -310,15 +321,15 @@ public class FPSecugen extends CordovaPlugin {
 
         // Calculate final score - weighted combination of factors
         double rawScore = edgeRatio * 0.4 +
-                        edgeSharpness * 0.4 +
-                        frequencyConsistency * 0.2;
+                edgeSharpness * 0.4 +
+                frequencyConsistency * 0.2;
 
         // Apply a non-linear transformation to spread out mid-range scores
         // This creates better differentiation in the middle quality range
         double nonLinearScore = 100 * (1 - Math.exp(-3 * rawScore));
 
         // Apply limits
-        int finalScore = (int)Math.min(99, Math.max(5, nonLinearScore));
+        int finalScore = (int) Math.min(99, Math.max(5, nonLinearScore));
 
         Log.d("RidgeClarity", "Raw score: " + rawScore + ", Final score: " + finalScore);
 
@@ -332,9 +343,9 @@ public class FPSecugen extends CordovaPlugin {
         for (int y = 1; y < height - 1; y++) {
             for (int x = 1; x < width - 1; x++) {
                 // Simplified Sobel operator
-                int gx = Math.abs(imageData[y*width + x+1] & 0xFF - imageData[y*width + x-1] & 0xFF);
-                int gy = Math.abs(imageData[(y+1)*width + x] & 0xFF - imageData[(y-1)*width + x] & 0xFF);
-                edges[y*width + x] = (byte)Math.min(255, gx + gy);
+                int gx = Math.abs(imageData[y * width + x + 1] & 0xFF - imageData[y * width + x - 1] & 0xFF);
+                int gy = Math.abs(imageData[(y + 1) * width + x] & 0xFF - imageData[(y - 1) * width + x] & 0xFF);
+                edges[y * width + x] = (byte) Math.min(255, gx + gy);
             }
         }
 
@@ -344,12 +355,14 @@ public class FPSecugen extends CordovaPlugin {
 
         for (byte edge : edges) {
             int val = edge & 0xFF;
-            if (val > 80) strongEdges++;
-            else if (val > 30) weakEdges++;
+            if (val > 80)
+                strongEdges++;
+            else if (val > 30)
+                weakEdges++;
         }
 
         // Good ratio of strong to weak edges indicates clear pattern
-        float total = strongEdges > 0 ? (float)strongEdges / (strongEdges + weakEdges) * 100 : 0;
+        float total = strongEdges > 0 ? (float) strongEdges / (strongEdges + weakEdges) * 100 : 0;
 
         return Math.round(total);
     }
@@ -359,7 +372,7 @@ public class FPSecugen extends CordovaPlugin {
         int[] ridgeWidths = new int[100];
         int samples = 0;
 
-        for (int y = height/4; y < height*3/4; y += height/20) {
+        for (int y = height / 4; y < height * 3 / 4; y += height / 20) {
             int currentRun = 0;
             // Set initial ridge state based on first pixel
             boolean inRidge = (imageData[y * width] & 0xFF) < 128;
@@ -420,7 +433,7 @@ public class FPSecugen extends CordovaPlugin {
 
         // Convert to score (lower std dev = higher consistency = higher score)
         double normalizedStdDev = Math.min(stdDev / mean, 1.0);
-        int score = (int)(100 * (1.0 - normalizedStdDev));
+        int score = (int) (100 * (1.0 - normalizedStdDev));
 
         Log.d("ConsistencyScore", "Mean: " + mean + ", StdDev: " + stdDev + ", Score: " + score);
         return score;
@@ -441,44 +454,49 @@ public class FPSecugen extends CordovaPlugin {
         return Math.round((normalizedNist + imageQuality) / 2);
     }
 
-    /*private void openDevice() {
-
-//        Toast.makeText(context, "Permission", Toast.LENGTH_SHORT).show();
-        debugMessage("Opening SecuGen Device\n");
-        long error = sgfplib.OpenDevice(0);
-        debugMessage("OpenDevice() ret: " + error + "\n");
-        if (error == SGFDxErrorCode.SGFDX_ERROR_NONE) {
-            bSecuGenDeviceOpened = true;
-            SecuGen.FDxSDKPro.SGDeviceInfoParam deviceInfo = new SecuGen.FDxSDKPro.SGDeviceInfoParam();
-            error = sgfplib.GetDeviceInfo(deviceInfo);
-            debugMessage("GetDeviceInfo() ret: " + error + "\n");
-            mImageWidth = deviceInfo.imageWidth;
-            mImageHeight = deviceInfo.imageHeight;
-            mImageDPI = deviceInfo.imageDPI;
-            serialNumber = new String(deviceInfo.deviceSN());
-            debugMessage("Image width: " + mImageWidth + "\n");
-            debugMessage("Image height: " + mImageHeight + "\n");
-            debugMessage("Image resolution: " + mImageDPI + "\n");
-            debugMessage("Serial Number: " + new String(deviceInfo.deviceSN()) + "\n");
-            sgfplib.SetTemplateFormat(SGFDxTemplateFormat.TEMPLATE_FORMAT_SG400);
-            sgfplib.GetMaxTemplateSize(mMaxTemplateSize);
-            debugMessage("TEMPLATE_FORMAT_SG400 SIZE: " + mMaxTemplateSize[0] + "\n");
-//                        mRegisterTemplate = new byte[mMaxTemplateSize[0]];
-//                        mVerifyTemplate = new byte[mMaxTemplateSize[0]];
-//                        EnableControls();
-//                        boolean smartCaptureEnabled = this.mToggleButtonSmartCapture.isChecked();
-//                        if (smartCaptureEnabled)
-//                            sgfplib.WriteData(SGFDxConstant.WRITEDATA_COMMAND_ENABLE_SMART_CAPTURE, (byte) 1);
-//                        else
-            sgfplib.WriteData(SGFDxConstant.WRITEDATA_COMMAND_ENABLE_SMART_CAPTURE, (byte) 0);
-//                        if (mAutoOnEnabled) {
-//                            autoOn.start();
-//                            DisableControls();
-//                        }
-        } else {
-            debugMessage("Waiting for USB Permission\n");
-        }
-    }*/
+    /*
+     * private void openDevice() {
+     * 
+     * // Toast.makeText(context, "Permission", Toast.LENGTH_SHORT).show();
+     * debugMessage("Opening SecuGen Device\n");
+     * long error = sgfplib.OpenDevice(0);
+     * debugMessage("OpenDevice() ret: " + error + "\n");
+     * if (error == SGFDxErrorCode.SGFDX_ERROR_NONE) {
+     * bSecuGenDeviceOpened = true;
+     * SecuGen.FDxSDKPro.SGDeviceInfoParam deviceInfo = new
+     * SecuGen.FDxSDKPro.SGDeviceInfoParam();
+     * error = sgfplib.GetDeviceInfo(deviceInfo);
+     * debugMessage("GetDeviceInfo() ret: " + error + "\n");
+     * mImageWidth = deviceInfo.imageWidth;
+     * mImageHeight = deviceInfo.imageHeight;
+     * mImageDPI = deviceInfo.imageDPI;
+     * serialNumber = new String(deviceInfo.deviceSN());
+     * debugMessage("Image width: " + mImageWidth + "\n");
+     * debugMessage("Image height: " + mImageHeight + "\n");
+     * debugMessage("Image resolution: " + mImageDPI + "\n");
+     * debugMessage("Serial Number: " + new String(deviceInfo.deviceSN()) + "\n");
+     * sgfplib.SetTemplateFormat(SGFDxTemplateFormat.TEMPLATE_FORMAT_SG400);
+     * sgfplib.GetMaxTemplateSize(mMaxTemplateSize);
+     * debugMessage("TEMPLATE_FORMAT_SG400 SIZE: " + mMaxTemplateSize[0] + "\n");
+     * // mRegisterTemplate = new byte[mMaxTemplateSize[0]];
+     * // mVerifyTemplate = new byte[mMaxTemplateSize[0]];
+     * // EnableControls();
+     * // boolean smartCaptureEnabled = this.mToggleButtonSmartCapture.isChecked();
+     * // if (smartCaptureEnabled)
+     * // sgfplib.WriteData(SGFDxConstant.WRITEDATA_COMMAND_ENABLE_SMART_CAPTURE,
+     * (byte) 1);
+     * // else
+     * sgfplib.WriteData(SGFDxConstant.WRITEDATA_COMMAND_ENABLE_SMART_CAPTURE,
+     * (byte) 0);
+     * // if (mAutoOnEnabled) {
+     * // autoOn.start();
+     * // DisableControls();
+     * // }
+     * } else {
+     * debugMessage("Waiting for USB Permission\n");
+     * }
+     * }
+     */
 
     private void requestPermission2(final CallbackContext callbackContext) {
         cordova.getThreadPool().execute(new Runnable() {
@@ -487,11 +505,13 @@ public class FPSecugen extends CordovaPlugin {
                 Log.d(TAG, "requestPermission2: start");
                 manager = (UsbManager) cordova.getActivity().getSystemService(Context.USB_SERVICE);
 
-                // Find the SecuGen USB device directly via UsbManager WITHOUT calling Init() first.
+                // Find the SecuGen USB device directly via UsbManager WITHOUT calling Init()
+                // first.
                 // On Android 14+, Init() internally tries to open the USB device and hangs
                 // indefinitely when USB permission has not yet been granted.
                 UsbDevice usbDevice = findSecuGenDevice(manager);
-                Log.d(TAG, "requestPermission2: findSecuGenDevice returned " + (usbDevice != null ? usbDevice.getDeviceName() : "null"));
+                Log.d(TAG, "requestPermission2: findSecuGenDevice returned "
+                        + (usbDevice != null ? usbDevice.getDeviceName() : "null"));
 
                 if (usbDevice == null) {
                     String message = "Error: Either a fingerprint device is not attached or the attached fingerprint device is not supported.";
@@ -505,7 +525,8 @@ public class FPSecugen extends CordovaPlugin {
 
                 if (manager.hasPermission(usbDevice)) {
                     // Permission already granted - init and open immediately
-                    Log.d(TAG, "requestPermission2: USB permission already granted, calling initSgfplibAndOpenDevice()");
+                    Log.d(TAG,
+                            "requestPermission2: USB permission already granted, calling initSgfplibAndOpenDevice()");
                     initSgfplibAndOpenDevice(callbackContext);
                 } else {
                     // Need to ask the user for permission
@@ -529,8 +550,7 @@ public class FPSecugen extends CordovaPlugin {
                             cordova.getActivity(),
                             0,
                             permissionIntent,
-                            piFlags
-                    );
+                            piFlags);
 
                     IntentFilter filter = new IntentFilter();
                     filter.addAction(UsbBroadcastReceiver.USB_PERMISSION);
@@ -548,14 +568,17 @@ public class FPSecugen extends CordovaPlugin {
     }
 
     /**
-     * Finds the first connected SecuGen fingerprint device using UsbManager directly,
-     * without calling sgfplib.Init() which can hang on Android 14+ before permission is granted.
+     * Finds the first connected SecuGen fingerprint device using UsbManager
+     * directly,
+     * without calling sgfplib.Init() which can hang on Android 14+ before
+     * permission is granted.
      * SecuGen devices use vendor ID 0x1162.
      */
     private UsbDevice findSecuGenDevice(UsbManager usbManager) {
         final int SECUGEN_VENDOR_ID = 0x1162;
         for (UsbDevice device : usbManager.getDeviceList().values()) {
-            Log.d(TAG, "findSecuGenDevice: found USB device vendorId=" + device.getVendorId() + " productId=" + device.getProductId() + " name=" + device.getDeviceName());
+            Log.d(TAG, "findSecuGenDevice: found USB device vendorId=" + device.getVendorId() + " productId="
+                    + device.getProductId() + " name=" + device.getDeviceName());
             if (device.getVendorId() == SECUGEN_VENDOR_ID) {
                 Log.d(TAG, "findSecuGenDevice: matched SecuGen device: " + device.getDeviceName());
                 return device;
@@ -565,32 +588,41 @@ public class FPSecugen extends CordovaPlugin {
     }
 
     /**
-     * Creates the sgfplib instance, calls Init() and then OpenDevice() via initDeviceSettings().
+     * Creates the sgfplib instance, calls Init() and then OpenDevice() via
+     * initDeviceSettings().
      * Must only be called AFTER USB permission has been granted.
      */
     private void initSgfplibAndOpenDevice(final CallbackContext callbackContext) {
-        Log.d(TAG, "initSgfplibAndOpenDevice: creating JSGFPLib and calling Init()");
-        sgfplib = new JSGFPLib((Context) cordova.getActivity().getBaseContext(), (UsbManager) context.getSystemService(Context.USB_SERVICE));
-        mLed = false;
+        if (sgfplib == null) {
+            Log.d(TAG, "initSgfplibAndOpenDevice: creating JSGFPLib and calling Init()");
+            sgfplib = new JSGFPLib((Context) cordova.getActivity().getBaseContext(),
+                    (UsbManager) context.getSystemService(Context.USB_SERVICE));
+            mLed = false;
 
-        long error = sgfplib.Init(SGFDxDeviceName.SG_DEV_AUTO);
-        Log.d(TAG, "initSgfplibAndOpenDevice: Init() returned " + error);
-        if (error != SGFDxErrorCode.SGFDX_ERROR_NONE) {
-            String message = "Fingerprint device initialization failed!";
-            if (error == SGFDxErrorCode.SGFDX_ERROR_DEVICE_NOT_FOUND) {
-                message = "Error: Either a fingerprint device is not attached or the attached fingerprint device is not supported.";
+            long error = sgfplib.Init(SGFDxDeviceName.SG_DEV_AUTO);
+            Log.d(TAG, "initSgfplibAndOpenDevice: Init() returned " + error);
+            if (error != SGFDxErrorCode.SGFDX_ERROR_NONE) {
+                String message = "Fingerprint device initialization failed!";
+                if (error == SGFDxErrorCode.SGFDX_ERROR_DEVICE_NOT_FOUND) {
+                    message = "Error: Either a fingerprint device is not attached or the attached fingerprint device is not supported.";
+                }
+                debugMessage(message);
+                Log.e(TAG, "initSgfplibAndOpenDevice: Init() failed - " + message);
+                sgfplib = null;
+                PluginResult result = new PluginResult(PluginResult.Status.ERROR, message);
+                result.setKeepCallback(true);
+                callbackContext.sendPluginResult(result);
+                return;
             }
-            debugMessage(message);
-            Log.e(TAG, "initSgfplibAndOpenDevice: Init() failed - " + message);
-            PluginResult result = new PluginResult(PluginResult.Status.ERROR, message);
-            result.setKeepCallback(true);
-            callbackContext.sendPluginResult(result);
-            return;
+            Log.d(TAG, "initSgfplibAndOpenDevice: Init() succeeded");
+        } else {
+            Log.d(TAG, "initSgfplibAndOpenDevice: reusing existing JSGFPLib instance");
         }
 
-        Log.d(TAG, "initSgfplibAndOpenDevice: Init() succeeded, calling initDeviceSettings()");
+        Log.d(TAG, "initSgfplibAndOpenDevice: calling initDeviceSettings()");
         initDeviceSettings();
-        Log.d(TAG, "initSgfplibAndOpenDevice: initDeviceSettings() complete, bSecuGenDeviceOpened=" + bSecuGenDeviceOpened);
+        Log.d(TAG, "initSgfplibAndOpenDevice: initDeviceSettings() complete, bSecuGenDeviceOpened="
+                + bSecuGenDeviceOpened);
 
         PluginResult result = new PluginResult(PluginResult.Status.OK, "Permission granted");
         result.setKeepCallback(true);
@@ -602,6 +634,10 @@ public class FPSecugen extends CordovaPlugin {
     }
 
     public void initDeviceSettings() {
+        if (bSecuGenDeviceOpened) {
+            Log.d(TAG, "initDeviceSettings: device already open, skipping OpenDevice()");
+            return;
+        }
         Log.d(TAG, "initDeviceSettings: start, sgfplib=" + (sgfplib != null ? "not null" : "NULL"));
         long error;
         Log.d(TAG, "initDeviceSettings: calling OpenDevice(0)...");
@@ -612,15 +648,17 @@ public class FPSecugen extends CordovaPlugin {
 
         if (!isOpened) {
             Log.e(TAG, "initDeviceSettings: OpenDevice failed with error " + error);
-            //init setting again...
-            /*if(openDeviceRequestCount < 40) {
-                initDeviceSettings();
-                try {
-                    Thread.sleep(500);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-            }*/
+            // init setting again...
+            /*
+             * if(openDeviceRequestCount < 40) {
+             * initDeviceSettings();
+             * try {
+             * Thread.sleep(500);
+             * } catch (InterruptedException e) {
+             * e.printStackTrace();
+             * }
+             * }
+             */
 
             return;
         } else {
@@ -638,7 +676,8 @@ public class FPSecugen extends CordovaPlugin {
         mImageHeight = deviceInfo.imageHeight;
         serialNumber = new String(deviceInfo.deviceSN());
         debugMessage("Setting props: mImageWidth: " + mImageWidth + " mImageHeight: " + mImageHeight);
-        Log.d(TAG, "initDeviceSettings: mImageWidth=" + mImageWidth + " mImageHeight=" + mImageHeight + " serialNumber=" + serialNumber);
+        Log.d(TAG, "initDeviceSettings: mImageWidth=" + mImageWidth + " mImageHeight=" + mImageHeight + " serialNumber="
+                + serialNumber);
         props = new ScanProperties(mImageWidth, mImageHeight);
         Field fieldName;
         try {
@@ -670,8 +709,10 @@ public class FPSecugen extends CordovaPlugin {
         Log.d(TAG, "initDeviceSettings: mMaxTemplateSize=" + mMaxTemplateSize[0]);
         mRegisterTemplate = new byte[mMaxTemplateSize[0]];
 
-        // Activate the LED. On Android 14+ the USB control transfer can fail immediately
-        // after OpenDevice() if the interface is not yet fully ready, so we retry with a
+        // Activate the LED. On Android 14+ the USB control transfer can fail
+        // immediately
+        // after OpenDevice() if the interface is not yet fully ready, so we retry with
+        // a
         // short delay before each attempt.
         Log.d(TAG, "initDeviceSettings: activating LED (writeData 5,1)...");
         long writeError = SGFDxErrorCode.SGFDX_ERROR_NONE + 1; // start as non-zero
@@ -689,18 +730,28 @@ public class FPSecugen extends CordovaPlugin {
             }
         }
         if (writeError != SGFDxErrorCode.SGFDX_ERROR_NONE) {
-            Log.w(TAG, "initDeviceSettings: LED activation failed after 3 attempts (error " + writeError + ") - scanner may still function");
+            Log.w(TAG, "initDeviceSettings: LED activation failed after 3 attempts (error " + writeError
+                    + ") - scanner may still function");
         }
     }
 
     private void closeDevice() {
-        if (sgfplib != null) {
-            sgfplib.CloseDevice();
-            sgfplib.Close();
-        }
+        // Do not call CloseDevice() or Close() here. CloseDevice() nulls the AKXUS
+        // object inside the AICamera SDK, and neither Init() nor a new JSGFPLib
+        // instance
+        // recreates it, causing a NullPointerException in the next OpenDevice() call.
+        // The device stays open; initDeviceSettings() guards against calling
+        // OpenDevice()
+        // a second time via bSecuGenDeviceOpened.
 
-        if (usbReceiver != null)
-            cordova.getActivity().unregisterReceiver(usbReceiver);
+        if (usbReceiver != null) {
+            try {
+                cordova.getActivity().unregisterReceiver(usbReceiver);
+            } catch (IllegalArgumentException e) {
+                Log.w(TAG, "closeDevice: receiver already unregistered");
+            }
+            usbReceiver = null;
+        }
     }
 
     public void capture(final CallbackContext callbackContext) {
@@ -710,15 +761,15 @@ public class FPSecugen extends CordovaPlugin {
             ex.printStackTrace();
             callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.ERROR, "Exception"));
         } catch (Exception ex) {
-//            openDevice();
+            // openDevice();
             ex.printStackTrace();
             Toast.makeText(context, "Capture Again! something went wrong", Toast.LENGTH_SHORT).show();
             callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.ERROR, "Exception"));
         }
     }
 
-    private float scoreMappingFunction (long nistScore, int imageQuality) {
-        int reverse = -(int)nistScore + 5;
+    private float scoreMappingFunction(long nistScore, int imageQuality) {
+        int reverse = -(int) nistScore + 5;
         float linerlyScaled = reverse * 0.8f;
         float scaled = reverse * 20;
         float ImageQualityScaled = customFunction(imageQuality) * 0.2f;
@@ -733,16 +784,16 @@ public class FPSecugen extends CordovaPlugin {
         }
     }
 
-    private double sigmoidLowerBound (float x) {
+    private double sigmoidLowerBound(float x) {
         return 100 / (1 + Math.exp((-x + 20) * 0.13));
     }
 
-    private double sigmoidUpperBound (float x) {
+    private double sigmoidUpperBound(float x) {
         return 100 / (1 + Math.exp((-x + 20) * 0.05));
     }
 
     public ImageData captureFingerPrint1(final CallbackContext callbackContext) throws IOException {
-//        sgfplib.
+        // sgfplib.
 
         long dwTimeStart = 0, dwTimeEnd = 0, dwTimeElapsed = 0;
         byte[] buffer = new byte[mImageWidth * mImageHeight];
@@ -754,7 +805,7 @@ public class FPSecugen extends CordovaPlugin {
 
         String NFIQString = "";
 
-//        DumpFile("capture2016.raw", buffer);
+        // DumpFile("capture2016.raw", buffer);
         dwTimeEnd = System.currentTimeMillis();
         dwTimeElapsed = dwTimeEnd - dwTimeStart;
         debugMessage("getImageEx(10000,50) ret:" + result + " [" + dwTimeElapsed + "ms]" + NFIQString + "\n");
@@ -766,7 +817,8 @@ public class FPSecugen extends CordovaPlugin {
         int[] wsqImageOutSize = new int[1];
         byte[] wsqImage = null;
 
-//        Toast.makeText(cordova.getActivity(), "captured", Toast.LENGTH_SHORT).show();//(TAG, byteArrayToBase64(buffer));
+        // Toast.makeText(cordova.getActivity(), "captured",
+        // Toast.LENGTH_SHORT).show();//(TAG, byteArrayToBase64(buffer));
 
         if (result == SGFDxErrorCode.SGFDX_ERROR_NONE) {
             result = sgfplib.GetImageQuality(mImageWidth, mImageHeight, buffer, quality);
@@ -789,12 +841,11 @@ public class FPSecugen extends CordovaPlugin {
                 int finalScore = 0;
                 if (ridgeClarity >= 10 && edgeQuality >= 10 && patternContinuity >= 10) {
                     // Weighted combination with reduced emphasis on pure darkness
-                    float combinedScore =
-                            fingerInfo.ImageQuality * 0.10f +  // Basic darkness
-                                    betterNistScore * 0.35f +        // Standard quality measure
-                                    ridgeClarity * 0.40f +          // Ridge clarity (important for clean lines)
-                                    edgeQuality * 0.10f +           // Edge quality (important for vectors)
-                                    patternContinuity * 0.05f;      // Pattern consistency
+                    float combinedScore = fingerInfo.ImageQuality * 0.10f + // Basic darkness
+                            betterNistScore * 0.35f + // Standard quality measure
+                            ridgeClarity * 0.40f + // Ridge clarity (important for clean lines)
+                            edgeQuality * 0.10f + // Edge quality (important for vectors)
+                            patternContinuity * 0.05f; // Pattern consistency
 
                     finalScore = Math.round(combinedScore);
                 }
@@ -819,17 +870,17 @@ public class FPSecugen extends CordovaPlugin {
                                 mImageWidth, mImageHeight, encodePixelDepth,
                                 encodePPI);
 
-//                        sgfplib.WS
+                        // sgfplib.WS
 
                         if (result == SGFDxErrorCode.SGFDX_ERROR_NONE) {
-                            //TODO send base64 image
+                            // TODO send base64 image
                             Bitmap bitmap = this.toGrayscale(buffer);
-//                            Utils.saveImageFile(context, callbackContext, bitmap, "fp");
-//                            File file = new java.io.File(Environment
-//                                    .getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-//                                    +"fp.png");
-//
-//                            Log.d("FP Path", file.getAbsolutePath());
+                            // Utils.saveImageFile(context, callbackContext, bitmap, "fp");
+                            // File file = new java.io.File(Environment
+                            // .getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+                            // +"fp.png");
+                            //
+                            // Log.d("FP Path", file.getAbsolutePath());
 
                             ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
                             bitmap.compress(Bitmap.CompressFormat.PNG, 100, byteArrayOutputStream);
@@ -837,10 +888,11 @@ public class FPSecugen extends CordovaPlugin {
 
                             String encoded = Base64.encodeToString(byteArray, Base64.DEFAULT);
                             String wsqEncoded = Base64.encodeToString(wsqImage, Base64.DEFAULT);
-//                            BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(file));
-//                            bos.write(buffer);
-//                            bos.flush();
-//                            bos.close();
+                            // BufferedOutputStream bos = new BufferedOutputStream(new
+                            // FileOutputStream(file));
+                            // bos.write(buffer);
+                            // bos.flush();
+                            // bos.close();
                             JSONObject json = new JSONObject();
                             try {
                                 // Inside the try block where you build your JSON response:
@@ -866,16 +918,17 @@ public class FPSecugen extends CordovaPlugin {
                 } else {
                     result = 10001;
 
-                    //send callback error
-                    PluginResult pluginResult = new PluginResult(PluginResult.Status.ERROR, "Quality of the fingerprint is less than " + QUALITY_VALUE);
+                    // send callback error
+                    PluginResult pluginResult = new PluginResult(PluginResult.Status.ERROR,
+                            "Quality of the fingerprint is less than " + QUALITY_VALUE);
                     callbackContext.sendPluginResult(pluginResult);
                 }
 
-//                buffer
-
+                // buffer
 
             } else {
-                PluginResult pluginResult = new PluginResult(PluginResult.Status.ERROR, "Quality Error Code: " + result);
+                PluginResult pluginResult = new PluginResult(PluginResult.Status.ERROR,
+                        "Quality Error Code: " + result);
                 callbackContext.sendPluginResult(pluginResult);
             }
         } else {
@@ -883,13 +936,12 @@ public class FPSecugen extends CordovaPlugin {
             callbackContext.sendPluginResult(pluginResult);
         }
 
-
         buffer = null;
 
         return new ImageData(result, buffer, wsqImage, fingerInfo.ImageQuality);
     }
 
-    //Converts image to grayscale (NEW)
+    // Converts image to grayscale (NEW)
     public Bitmap toGrayscale(byte[] mImageBuffer) {
         byte[] Bits = new byte[mImageBuffer.length * 4];
         for (int i = 0; i < mImageBuffer.length; i++) {
@@ -898,7 +950,7 @@ public class FPSecugen extends CordovaPlugin {
         }
 
         Bitmap bmpGrayscale = Bitmap.createBitmap(mImageWidth, mImageHeight, Bitmap.Config.ARGB_8888);
-        //Bitmap bm contains the fingerprint img
+        // Bitmap bm contains the fingerprint img
         bmpGrayscale.copyPixelsFromBuffer(ByteBuffer.wrap(Bits));
         return bmpGrayscale;
     }
@@ -921,16 +973,18 @@ public class FPSecugen extends CordovaPlugin {
 
     /**
      * Analyzes how much of the canvas is covered by an actual fingerprint pattern.
-     * This method distinguishes between random dark pixels and structured fingerprint patterns
+     * This method distinguishes between random dark pixels and structured
+     * fingerprint patterns
      * by analyzing local neighborhoods for ridge-like structures
      *
      * @param imageData The raw fingerprint image data
-     * @param width The width of the image
-     * @param height The height of the image
+     * @param width     The width of the image
+     * @param height    The height of the image
      * @return A score from 0-100 indicating fingerprint coverage percentage
      */
     private int analyzeFingerPrintCoverage(byte[] imageData, int width, int height) {
-        // We'll divide the image into a grid of cells and check each for fingerprint pattern
+        // We'll divide the image into a grid of cells and check each for fingerprint
+        // pattern
         int cellSize = 16; // Size of each cell to analyze
         int cellsX = width / cellSize;
         int cellsY = height / cellSize;
@@ -938,8 +992,8 @@ public class FPSecugen extends CordovaPlugin {
         int cellsWithFingerprint = 0;
 
         // Thresholds for fingerprint pattern detection
-        final int MIN_DARK_PIXELS = (int)(cellSize * cellSize * 0.2);  // Min 20% dark pixels
-        final int MIN_TRANSITIONS = 3;  // Minimum ridge transitions to consider a fingerprint pattern
+        final int MIN_DARK_PIXELS = (int) (cellSize * cellSize * 0.2); // Min 20% dark pixels
+        final int MIN_TRANSITIONS = 3; // Minimum ridge transitions to consider a fingerprint pattern
         final int DARK_THRESHOLD = 128; // Threshold for dark vs light pixels
 
         // Check each cell for fingerprint patterns
@@ -962,13 +1016,14 @@ public class FPSecugen extends CordovaPlugin {
                 if (darkPixels > MIN_DARK_PIXELS) {
                     // Check for ridge patterns - horizontal scan
                     int hTransitions = countRidgeTransitions(imageData, startX, startY,
-                                                            cellSize, width, height, true);
+                            cellSize, width, height, true);
 
                     // Check for ridge patterns - vertical scan
                     int vTransitions = countRidgeTransitions(imageData, startX, startY,
-                                                            cellSize, width, height, false);
+                            cellSize, width, height, false);
 
-                    // Cells with ridge transitions in both directions are likely fingerprint patterns
+                    // Cells with ridge transitions in both directions are likely fingerprint
+                    // patterns
                     if (hTransitions >= MIN_TRANSITIONS && vTransitions >= MIN_TRANSITIONS) {
                         cellsWithFingerprint++;
                     }
@@ -981,28 +1036,28 @@ public class FPSecugen extends CordovaPlugin {
         }
 
         // Calculate coverage percentage
-        double coverage = (double)cellsWithFingerprint / totalCells;
+        double coverage = (double) cellsWithFingerprint / totalCells;
 
         // Apply scoring logic
         int coverageScore;
 
         if (coverage < 0.2) {
             // Less than 20% coverage - linear score from 0-50
-            coverageScore = (int)(coverage * 250);
+            coverageScore = (int) (coverage * 250);
         } else if (coverage < 0.5) {
             // 20-50% coverage - linear score from 50-80
-            coverageScore = (int)(50 + ((coverage - 0.2) / 0.3) * 30);
+            coverageScore = (int) (50 + ((coverage - 0.2) / 0.3) * 30);
         } else if (coverage < 0.7) {
             // 50-70% coverage - linear score from 80-95
-            coverageScore = (int)(80 + ((coverage - 0.5) / 0.2) * 15);
+            coverageScore = (int) (80 + ((coverage - 0.5) / 0.2) * 15);
         } else {
             // 70-100% coverage - linear score from 95-100
-            coverageScore = (int)(95 + ((coverage - 0.7) / 0.3) * 5);
+            coverageScore = (int) (95 + ((coverage - 0.7) / 0.3) * 5);
         }
 
         Log.d("CoverageAnalysis",
-              String.format("Cells with fingerprint: %d/%d (%.1f%%), Score: %d",
-                           cellsWithFingerprint, totalCells, coverage * 100, coverageScore));
+                String.format("Cells with fingerprint: %d/%d (%.1f%%), Score: %d",
+                        cellsWithFingerprint, totalCells, coverage * 100, coverageScore));
 
         return Math.min(100, Math.max(0, coverageScore));
     }
@@ -1010,17 +1065,17 @@ public class FPSecugen extends CordovaPlugin {
     /**
      * Helper method to count ridge transitions along a line
      *
-     * @param imageData The raw image data
-     * @param startX Starting X coordinate of the scan
-     * @param startY Starting Y coordinate of the scan
-     * @param length Length of the scan
-     * @param width Image width
-     * @param height Image height
+     * @param imageData  The raw image data
+     * @param startX     Starting X coordinate of the scan
+     * @param startY     Starting Y coordinate of the scan
+     * @param length     Length of the scan
+     * @param width      Image width
+     * @param height     Image height
      * @param horizontal If true, scan horizontally, otherwise vertically
      * @return Number of ridge transitions detected
      */
     private int countRidgeTransitions(byte[] imageData, int startX, int startY, int length,
-                                     int width, int height, boolean horizontal) {
+            int width, int height, boolean horizontal) {
         int transitions = 0;
         boolean inRidge = false;
         int runLength = 0;
@@ -1028,8 +1083,9 @@ public class FPSecugen extends CordovaPlugin {
 
         if (horizontal) {
             // Scan horizontally along the middle of the cell
-            int y = startY + length/2;
-            if (y >= height) y = height - 1;
+            int y = startY + length / 2;
+            if (y >= height)
+                y = height - 1;
 
             // Initialize the first pixel state
             inRidge = (imageData[y * width + startX] & 0xFF) < 128;
@@ -1049,8 +1105,9 @@ public class FPSecugen extends CordovaPlugin {
             }
         } else {
             // Scan vertically along the middle of the cell
-            int x = startX + length/2;
-            if (x >= width) x = width - 1;
+            int x = startX + length / 2;
+            if (x >= width)
+                x = width - 1;
 
             // Initialize the first pixel state
             inRidge = (imageData[startY * width + x] & 0xFF) < 128;
@@ -1098,35 +1155,35 @@ public class FPSecugen extends CordovaPlugin {
             this.activity = activity;
         }
 
-//        private int count = 0;
-
+        // private int count = 0;
 
         /**
          * Handle permission answer
          *
          * @param context
          * @param intent
-         * @see android.content.BroadcastReceiver#onReceive(android.content.Context, android.content.Intent)
+         * @see android.content.BroadcastReceiver#onReceive(android.content.Context,
+         *      android.content.Intent)
          */
-//        @Override
-//        public void onReceive(Context context, Intent intent) {
-//            String action = intent.getAction();
-//            if (USB_PERMISSION.equals(action)) {
-//                // deal with the user answer about the permission
-//                if (intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)) {
-//                    Log.d(TAG, "Permission to connect to the device was accepted!");
-//                    initDeviceSettings();
-//                    if (callbackContext != null)
-//                        callbackContext.success("Permission to connect to the device was accepted!");
-//                } else {
-//                    Log.d(TAG, "Permission to connect to the device was denied!");
-//                    if (callbackContext != null)
-//                        callbackContext.error("Permission to connect to the device was denied!");
-//                }
-//                // unregister the broadcast receiver since it's no longer needed
-//                activity.unregisterReceiver(this);
-//            }
-//        }
+        // @Override
+        // public void onReceive(Context context, Intent intent) {
+        // String action = intent.getAction();
+        // if (USB_PERMISSION.equals(action)) {
+        // // deal with the user answer about the permission
+        // if (intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)) {
+        // Log.d(TAG, "Permission to connect to the device was accepted!");
+        // initDeviceSettings();
+        // if (callbackContext != null)
+        // callbackContext.success("Permission to connect to the device was accepted!");
+        // } else {
+        // Log.d(TAG, "Permission to connect to the device was denied!");
+        // if (callbackContext != null)
+        // callbackContext.error("Permission to connect to the device was denied!");
+        // }
+        // // unregister the broadcast receiver since it's no longer needed
+        // activity.unregisterReceiver(this);
+        // }
+        // }
         @Override
         public void onReceive(Context context, Intent intent) {
             String action = intent.getAction();
@@ -1135,9 +1192,11 @@ public class FPSecugen extends CordovaPlugin {
                 synchronized (this) {
                     UsbDevice device = (UsbDevice) intent.getParcelableExtra(UsbManager.EXTRA_DEVICE);
                     boolean permissionGranted = intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false);
-                    Log.d(TAG, "onReceive: permissionGranted=" + permissionGranted + ", device=" + (device != null ? device.getDeviceName() : "null"));
+                    Log.d(TAG, "onReceive: permissionGranted=" + permissionGranted + ", device="
+                            + (device != null ? device.getDeviceName() : "null"));
                     if (permissionGranted) {
-                        // Must run Init() and OpenDevice() on a background thread after permission is granted.
+                        // Must run Init() and OpenDevice() on a background thread after permission is
+                        // granted.
                         // Init() was intentionally NOT called before the permission dialog to avoid
                         // it hanging on Android 14+ before USB permission is granted.
                         Log.d(TAG, "Launching initSgfplibAndOpenDevice on background thread");
